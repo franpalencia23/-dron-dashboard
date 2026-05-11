@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dron — Detector de Incendios</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700&display=swap');
+:root{
+  --bg:#070b12;--s1:#0d1520;--s2:#111c2e;--b:#1a2740;
+  --acc:#ff5722;--teal:#00e5cc;--blue:#4488ff;--ok:#00d67f;
+  --warn:#ffaa00;--danger:#ff3b3b;--text:#ddeeff;--muted:#5a7898;
+  --mono:'Share Tech Mono',monospace;--body:'Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;overflow-x:hidden}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(68,136,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(68,136,255,.04) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+#banner{display:none;padding:13px 20px;text-align:center;font-family:var(--mono);
+  font-size:.9rem;letter-spacing:3px;font-weight:700;}
+#banner.posible{display:block;background:rgba(255,170,0,.12);color:var(--warn);
+  border-bottom:1px solid rgba(255,170,0,.3);animation:flash 1s infinite}
+#banner.incendio{display:block;background:rgba(255,59,59,.15);color:var(--danger);
+  border-bottom:1px solid rgba(255,59,59,.35);animation:flash .7s infinite}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.55}}
+header{
+  background:rgba(13,21,32,.9);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--b);padding:14px 28px;
+  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;
+}
+.logo-wrap{position:relative;width:42px;height:42px}
+.logo-wrap svg{position:absolute;inset:0}
+.ping{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--acc);
+  animation:ping 2s ease-out infinite;opacity:0}
+@keyframes ping{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+header h1{font-size:1.1rem;font-weight:700;letter-spacing:.5px}
+header p{font-size:.72rem;color:var(--muted);margin-top:1px}
+.pill{margin-left:auto;display:flex;align-items:center;gap:7px;background:var(--s1);
+  border:1px solid var(--b);border-radius:30px;padding:5px 14px;
+  font-size:.75rem;color:var(--muted);font-family:var(--mono);}
+.pill-dot{width:7px;height:7px;border-radius:50%}
+main{max-width:1000px;margin:0 auto;padding:28px 20px}
+.section-label{font-size:.65rem;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;padding-left:2px;font-family:var(--mono);}
+.row-gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+.row-bars{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:28px}
+@media(max-width:640px){
+  .row-gauges{grid-template-columns:1fr}
+  .row-bars{grid-template-columns:1fr}
+}
+.card{background:var(--s1);border:1px solid var(--b);border-radius:18px;
+  padding:22px 20px;position:relative;overflow:hidden;}
+.card-line{position:absolute;top:0;left:0;right:0;height:2px;border-radius:18px 18px 0 0}
+.lbl{font-size:.65rem;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px;font-family:var(--mono)}
+.src{font-size:.68rem;color:var(--muted);margin-top:12px;font-family:var(--mono)}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center}
+.gauge-svg{width:140px;height:140px}
+.gauge-track{fill:none;stroke:var(--b);stroke-width:10;stroke-linecap:round}
+.gauge-fill{fill:none;stroke-width:10;stroke-linecap:round;
+  transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .5s ease;
+  transform-origin:center;transform:rotate(-210deg)}
+.gauge-val{font-family:var(--mono);font-size:1.5rem;font-weight:700;
+  fill:var(--text);text-anchor:middle;dominant-baseline:middle}
+.gauge-unit{font-family:var(--body);font-size:.65rem;fill:var(--muted);text-anchor:middle}
+.bar-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.bar-big{font-family:var(--mono);font-size:2rem;font-weight:700}
+.bar-unit{font-size:.9rem;color:var(--muted);margin-left:3px}
+.bar-track{background:var(--b);border-radius:10px;height:12px;overflow:hidden;margin-bottom:8px}
+.bar-fill{height:12px;border-radius:10px;transition:width .7s ease,background .5s ease;min-width:4px}
+.bar-ticks{display:flex;justify-content:space-between;font-size:.62rem;
+  color:var(--muted);font-family:var(--mono)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;
+  border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;font-family:var(--mono);}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.badge.ok    {background:rgba(0,214,127,.1);color:var(--ok);  border:1px solid rgba(0,214,127,.25)}
+.badge.warn  {background:rgba(255,170,0,.1);color:var(--warn);border:1px solid rgba(255,170,0,.25)}
+.badge.danger{background:rgba(255,59,59,.1);color:var(--danger);border:1px solid rgba(255,59,59,.3)}
+.status-big{font-family:var(--mono);font-size:1.5rem;font-weight:700;
+  letter-spacing:1px;margin:10px 0 16px;}
+.status-big.ok    {color:var(--ok)}
+.status-big.warn  {color:var(--warn)}
+.status-big.danger{color:var(--danger)}
+.stat-row{display:flex;justify-content:space-between;font-size:.78rem;
+  color:var(--muted);margin-top:8px;font-family:var(--mono)}
+.stat-row span:last-child{color:var(--text)}
+footer{text-align:center;padding:18px;font-size:.68rem;
+  color:var(--muted);border-top:1px solid var(--b);font-family:var(--mono);}
+</style>
+</head>
+<body>
+
+<div id="banner"></div>
+
+<header>
+  <div class="logo-wrap">
+    <div class="ping"></div>
+    <svg viewBox="0 0 42 42" fill="none">
+      <circle cx="21" cy="21" r="20" stroke="#ff5722" stroke-width="1.5"/>
+      <polygon points="21,8 26,21 21,18 16,21" fill="#ff5722"/>
+      <line x1="7"  y1="21" x2="13" y2="21" stroke="#00e5cc" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="29" y1="21" x2="35" y2="21" stroke="#00e5cc" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="21" y1="29" x2="21" y2="35" stroke="#00e5cc" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M10 32 Q21 25 32 32" stroke="#00e5cc" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Dron Detector de Incendios Forestales</h1>
+    <p>ESP32 &middot; MicroPython &middot; DHT22 / MQ-2 / MLX90614 &middot; Clever Cloud</p>
+  </div>
+  <div class="pill">
+    <div class="pill-dot" id="dot" style="background:#5a7898"></div>
+    <span id="txt-status">Conectando...</span>
+  </div>
+</header>
+
+<main>
+  <div class="section-label">Mediciones ambientales</div>
+  <div class="row-gauges">
+
+    <div class="card">
+      <div class="card-line" style="background:var(--teal)"></div>
+      <div class="lbl">Temperatura Amb.</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 140">
+          <circle class="gauge-track" cx="70" cy="70" r="54"
+            stroke-dasharray="254" stroke-dashoffset="64"/>
+          <circle class="gauge-fill" id="g-temp-fill" cx="70" cy="70" r="54"
+            stroke="var(--teal)" stroke-dasharray="254" stroke-dashoffset="254"/>
+          <text class="gauge-val" id="g-temp-val" x="70" y="66">--</text>
+          <text class="gauge-unit" x="70" y="85">°C</text>
+        </svg>
+      </div>
+      <div class="src">DHT22</div>
+    </div>
+
+    <div class="card">
+      <div class="card-line" style="background:var(--blue)"></div>
+      <div class="lbl">Humedad Relativa</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 140">
+          <circle class="gauge-track" cx="70" cy="70" r="54"
+            stroke-dasharray="254" stroke-dashoffset="64"/>
+          <circle class="gauge-fill" id="g-hum-fill" cx="70" cy="70" r="54"
+            stroke="var(--blue)" stroke-dasharray="254" stroke-dashoffset="254"/>
+          <text class="gauge-val" id="g-hum-val" x="70" y="66">--</text>
+          <text class="gauge-unit" x="70" y="85">%</text>
+        </svg>
+      </div>
+      <div class="src">DHT22</div>
+    </div>
+
+    <div class="card">
+      <div class="card-line" style="background:var(--acc)"></div>
+      <div class="lbl">Temperatura IR Superficie</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 140">
+          <circle class="gauge-track" cx="70" cy="70" r="54"
+            stroke-dasharray="254" stroke-dashoffset="64"/>
+          <circle class="gauge-fill" id="g-ir-fill" cx="70" cy="70" r="54"
+            stroke="var(--acc)" stroke-dasharray="254" stroke-dashoffset="254"/>
+          <text class="gauge-val" id="g-ir-val" x="70" y="66">--</text>
+          <text class="gauge-unit" x="70" y="85">°C</text>
+        </svg>
+      </div>
+      <div class="src">MLX90614 &mdash; Infrarrojo</div>
+    </div>
+
+  </div>
+
+  <div class="section-label">Gas / humo y estado del sistema</div>
+  <div class="row-bars">
+
+    <div class="card">
+      <div class="card-line" style="background:var(--warn)"></div>
+      <div class="lbl">Concentracion de Gases / Humo</div>
+      <div class="bar-header">
+        <div>
+          <span class="bar-big" id="gas-val" style="color:var(--warn)">--</span>
+          <span class="bar-unit">ppm</span>
+        </div>
+        <div id="gas-badge"></div>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="gas-bar" style="width:0%;background:var(--ok)"></div>
+      </div>
+      <div class="bar-ticks">
+        <span>0</span><span>100</span><span>200</span><span>300</span><span>500+ ppm</span>
+      </div>
+      <div style="margin-top:16px">
+        <div style="font-size:.62rem;letter-spacing:1.5px;color:var(--muted);
+          font-family:var(--mono);margin-bottom:6px;text-transform:uppercase">
+          Historial reciente
+        </div>
+        <svg id="spark" viewBox="0 0 260 50" style="width:100%;height:50px">
+          <polyline id="spark-line" points="" fill="none" stroke="var(--warn)"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+        </svg>
+      </div>
+      <div class="src">MQ-2 &mdash; Sensor de humo y gases combustibles</div>
+    </div>
+
+    <div class="card">
+      <div class="card-line" style="background:var(--danger)"></div>
+      <div class="lbl">Estado del Sistema</div>
+      <div id="estado-badge"></div>
+      <div class="status-big" id="estado-txt">--</div>
+      <div class="stat-row">
+        <span>Temp. ambiente</span><span id="st-tamb">-- °C</span>
+      </div>
+      <div class="stat-row">
+        <span>Humedad</span><span id="st-hum">-- %</span>
+      </div>
+      <div class="stat-row">
+        <span>Temperatura IR</span><span id="st-tir">-- °C</span>
+      </div>
+      <div class="stat-row">
+        <span>Gas / humo</span><span id="st-ppm">-- ppm</span>
+      </div>
+      <div class="stat-row"
+        style="margin-top:14px;border-top:1px solid var(--b);padding-top:10px">
+        <span>Ultimo registro</span>
+        <span id="st-ts" style="color:var(--teal)">--</span>
+      </div>
+      <div class="stat-row">
+        <span>Total registros DB</span><span id="st-total">--</span>
+      </div>
+      <div class="src">Datos desde Clever Cloud &mdash; API Render</div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  Dron detector de incendios &nbsp;&mdash;&nbsp;
+  DHT22 &middot; MQ-2 &middot; MLX90614 &nbsp;&mdash;&nbsp;
+  Clever Cloud MySQL &nbsp;&mdash;&nbsp;
+  <span id="footer-ts">--</span>
+</footer>
+
+<script>
+var API_BASE = "https://dron-api.onrender.com";
+
+var histPpm = [];
+var CIRC    = 254;
+
+function gaugeOffset(val, min, max) {
+  var pct = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  return (CIRC * (1 - pct)).toFixed(1);
+}
+function ppmColor(ppm) {
+  if (ppm > 500) return '#ff3b3b';
+  if (ppm > 300) return '#ffaa00';
+  return '#00d67f';
+}
+function irColor(t) {
+  if (t > 60) return '#ff3b3b';
+  if (t > 45) return '#ffaa00';
+  return '#ff5722';
+}
+function badge(cls, txt) {
+  return '<span class="badge '+cls+'"><span class="badge-dot"></span>'+txt+'</span>';
+}
+function updateSpark() {
+  var pts = '', n = histPpm.length;
+  for (var i = 0; i < n; i++) {
+    var x = (i / (Math.max(n - 1, 1))) * 260;
+    var y = 48 - Math.min(48, (histPpm[i] / 600) * 48);
+    pts += x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+  }
+  document.getElementById('spark-line').setAttribute('points', pts.trim());
+}
+
+async function actualizar() {
+  try {
+    var r1 = await fetch(API_BASE + '/api/ultima');
+    var j1 = await r1.json();
+    if (!j1.ok) throw new Error('sin datos');
+    var d = j1.dato;
+
+    document.getElementById('g-temp-val').textContent = d.temperatura;
+    document.getElementById('g-temp-fill').style.strokeDashoffset =
+      gaugeOffset(d.temperatura, 0, 50);
+
+    document.getElementById('g-hum-val').textContent = d.humedad;
+    document.getElementById('g-hum-fill').style.strokeDashoffset =
+      gaugeOffset(d.humedad, 0, 100);
+
+    document.getElementById('g-ir-val').textContent = d.temp_ir;
+    var fillIR = document.getElementById('g-ir-fill');
+    fillIR.style.strokeDashoffset = gaugeOffset(d.temp_ir, 0, 120);
+    fillIR.style.stroke = irColor(d.temp_ir);
+
+    var ppm = d.gas_ppm;
+    var col = ppmColor(ppm);
+    document.getElementById('gas-val').textContent    = ppm;
+    document.getElementById('gas-val').style.color    = col;
+    var pct = Math.min(100, (ppm / 500) * 100).toFixed(1);
+    document.getElementById('gas-bar').style.width      = pct + '%';
+    document.getElementById('gas-bar').style.background = col;
+    document.getElementById('gas-badge').innerHTML =
+      d.estado_gas === 'incendio' ? badge('danger', 'Incendio') :
+      d.estado_gas === 'posible'  ? badge('warn',   'Posible incendio') :
+      badge('ok', 'Normal');
+
+    histPpm.push(ppm);
+    if (histPpm.length > 20) histPpm.shift();
+    updateSpark();
+
+    var txt, cls;
+    if (d.nivel_alerta === 'incendio')     { txt='INCENDIO';         cls='danger'; }
+    else if (d.nivel_alerta === 'posible') { txt='POSIBLE INCENDIO'; cls='warn';   }
+    else                                   { txt='SIN ALERTAS';      cls='ok';     }
+    document.getElementById('estado-badge').innerHTML = badge(cls, txt);
+    var stxt = document.getElementById('estado-txt');
+    stxt.textContent = txt;
+    stxt.className   = 'status-big ' + cls;
+
+    document.getElementById('st-tamb').textContent = d.temperatura + ' °C';
+    document.getElementById('st-hum').textContent  = d.humedad     + ' %';
+    document.getElementById('st-tir').textContent  = d.temp_ir     + ' °C';
+    document.getElementById('st-ppm').textContent  = d.gas_ppm     + ' ppm';
+    document.getElementById('st-ts').textContent   = d.creado_en;
+    document.getElementById('footer-ts').textContent = d.creado_en;
+
+    var r2  = await fetch(API_BASE + '/api/mediciones?limite=1');
+    var j2  = await r2.json();
+    document.getElementById('st-total').textContent = j2.total_global || '0';
+
+    var b = document.getElementById('banner');
+    b.className = '';
+    if (d.nivel_alerta === 'incendio') {
+      b.className   = 'incendio';
+      b.textContent = '\u26a0\ufe0f  ALERTA \u2014 INCENDIO DETECTADO  \u26a0\ufe0f';
+    } else if (d.nivel_alerta === 'posible') {
+      b.className   = 'posible';
+      b.textContent = 'ATENCION \u2014 POSIBLE INCENDIO DETECTADO';
+    }
+
+    document.getElementById('txt-status').textContent = 'En linea';
+    document.getElementById('dot').style.background   = '#00d67f';
+
+  } catch(e) {
+    document.getElementById('txt-status').textContent = 'Sin conexion';
+    document.getElementById('dot').style.background   = '#ff3b3b';
+    console.error(e);
+  }
+}
+
+actualizar();
+setInterval(actualizar, 5000);
+</script>
+</body>
+</html>
